@@ -1,5 +1,6 @@
 import sys
 import time
+import random
 
 import click
 from selenium import webdriver
@@ -10,18 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common import exceptions as sl_exceptions
 
 
-driver = webdriver.Chrome()
-driver.get("https://www.instagram.com")
-
-
-@click.command()
-@click.argument('username', required=True)
-@click.argument('password', required=True)
-@click.argument('posturl', required=True)
-@click.argument('inputfile', type=click.File('r'), default='input.txt')
-def run(username, password, posturl, inputfile):
-    inputs = inputfile.read().split('\n')
-
+def do_login(driver, username, password, posturl):
     username_input = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.XPATH, '//*[@name="username"]'))
     )
@@ -36,31 +26,57 @@ def run(username, password, posturl, inputfile):
             (By.XPATH, '//*[@aria-label="Página inicial"]')
         )
     )
-
     driver.get(posturl)
+
+
+@click.command()
+@click.argument('username', required=True)
+@click.argument('password', required=True)
+@click.argument('posturl', required=True)
+@click.argument('inputfile', type=click.File('r'), default='input.txt')
+def run(username, password, posturl, inputfile):
+    inputs = inputfile.read().split('\n')
+    # random.shuffle(arrobas)
+
+    driver = webdriver.Chrome()
+    driver.get("https://www.instagram.com")
+    do_login(driver, username, password, posturl)
+
+    tam = len(inputs)
     i = 0
-    while i<(len(inputs)):
+    ok = 0
+    while i<(tam):
         try:
+            time.sleep(1)
             comment_input = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located(
                     (By.XPATH, '//*[@aria-label="Adicione um comentário..."]')
                 )
             )
             comment_input.send_keys(inputs[i])
-
+            time.sleep(1)
             button = driver.find_element(
                 By.XPATH, '//button[text()="Publicar"]'
             )
             button.click()
-            print('posted: {}'.format(inputs[i]))
-            i = i+1
+            try:
+                error = WebDriverWait(driver, 3).until(
+                    EC.presence_of_element_located(
+                        (By.XPATH, '//*[text()="Tentar novamente"]')
+                    )
+                )
+            except:
+                ok = ok+1
+                i = i+1
+                print('posted: {}'.format(inputs[i]))
 
         except sl_exceptions.InvalidElementStateException as err:
-            time.sleep(2)
             print(err)
+            print('{}/{}'.format(i, tam))
             driver.get(posturl)
         except sl_exceptions.WebDriverException as err:
             print(err)
+            print('{}/{}'.format(i, tam))
             continue
 
 if __name__ == '__main__':
